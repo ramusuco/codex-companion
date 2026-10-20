@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Show account-wide remaining allowance and reset times above the session list.
+- Refresh account limits about once per minute while visible, with explicit stale/error states.
+- Distinguish estimated response activity, completed records, interrupted records, and unknown state with colors and icons.
+- Retain per-session context estimates and label them separately from account allowance.
+
 ## 0.4.0
 
 - Display recorded session lifecycle and estimated remaining context in the session list.

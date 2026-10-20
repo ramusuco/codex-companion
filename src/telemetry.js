@@ -9,7 +9,7 @@ function parseTelemetry(text, truncated = false) {
   if (truncated) lines.shift();
   // Ignore an unfinished trailing write.
   if (!text.endsWith('\n')) lines.pop();
-  const result = { state: 'unknown', stateAt: null, usage: null };
+  const result = { state: 'unknown', stateAt: null, activityAt: null, usage: null };
   for (const line of lines) {
     let entry;
     try { entry = JSON.parse(line); } catch { continue; }
@@ -17,6 +17,7 @@ function parseTelemetry(text, truncated = false) {
     if (entry.type !== 'event_msg') continue;
     const event = entry.payload;
     if (!event) continue;
+    if (Number.isFinite(Date.parse(entry.timestamp))) result.activityAt = entry.timestamp;
     const state = {
       task_started: 'started', task_complete: 'completed',
       turn_aborted: 'interrupted'
@@ -67,20 +68,27 @@ class TelemetryReader {
   }
 }
 
-function describeTelemetry(data = {}) {
+function describeTelemetry(data = {}, now = Date.now()) {
+  const activity = Date.parse(data.activityAt || data.stateAt);
+  const recent = Number.isFinite(activity) && now - activity >= 0 && now - activity <= 30000;
   const state = {
-    started: ['開始記録あり', 'history'],
-    completed: ['完了記録', 'pass'],
-    interrupted: ['中断記録', 'debug-pause']
-  }[data.state] || ['状態不明', 'question'];
+    started: recent
+      ? ['応答中（推定）', 'sync~spin', 'charts.blue']
+      : ['実行状況不明', 'history', 'charts.yellow'],
+    completed: ['完了記録', 'pass-filled', 'charts.green'],
+    interrupted: ['中断記録', 'debug-pause', 'charts.yellow']
+  }[data.state] || ['状態不明', 'question', 'disabledForeground'];
   const usage = data.usage;
   const date = value => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : '不明';
   return {
-    description: `${state[0]} · ${usage ? `残 約${usage.percent}%` : '残量不明'}`,
+    description: `${state[0]} · ${usage ? `文脈残 約${usage.percent}%` : '文脈残量不明'}`,
     icon: state[1],
+    color: state[2],
     detail: [
       `状態: ${state[0]}（保存ログ）`,
       `状態の記録日時: ${date(data.stateAt)}`,
+      `ログの活動記録: ${date(data.activityAt)}`,
+      '「応答中（推定）」は開始後30秒以内にログ活動がある場合です。接続や実行を直接確認した状態ではありません。',
       '開始記録だけでは現在の実行継続・承認待ち・停止を判別できません。',
       usage
         ? `コンテキスト残量の目安: ${usage.remaining.toLocaleString()} / ${usage.limit.toLocaleString()} tokens（約${usage.percent}%）\n直近の使用量: ${usage.used.toLocaleString()} tokens\n使用量の記録日時: ${date(usage.at)}`

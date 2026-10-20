@@ -6,6 +6,7 @@ const { readSessions, conversationPath, UUID } = require('./sessions');
 const { withServer, listSessions } = require('./backend');
 const fs = require('node:fs');
 const { TelemetryReader, describeTelemetry } = require('./telemetry');
+const { parseLimits, describeWindow } = require('./limits');
 
 function activate(context) {
   const changed = new vscode.EventEmitter();
@@ -18,6 +19,11 @@ function activate(context) {
   let telemetryUpdating = false;
   let telemetryDisposed = false;
   const telemetryReader = new TelemetryReader();
+  let limits;
+  let limitsError;
+  let limitsRefreshing;
+  let limitsAttemptedAt = 0;
+  const limitsNode = { kind: 'limits' };
   const config = () => vscode.workspace.getConfiguration('codexCompanion');
   const home = () => config().get('codexHome') || process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
   const output = vscode.window.createOutputChannel('codex-companion');
@@ -39,18 +45,77 @@ function activate(context) {
   };
   const provider = {
     onDidChangeTreeData: changed.event,
-    getChildren: () => sessions,
+    getChildren(row) {
+      if (!row) return [limitsNode, ...sessions];
+      if (row.kind === 'limits') {
+        const children = (limits?.windows || []).map(window => ({ kind: 'limitWindow', window }));
+        if (limits?.usageBlocked) children.unshift({ kind: 'notice', title: '現在、通常の利用が制限されています' });
+        if (!children.length) children.push({
+          kind: 'notice',
+          title: limitsError ? '利用枠を取得できませんでした' : limitsRefreshing ? '利用枠を取得中…' : '利用枠の情報がありません'
+        });
+        return children;
+      }
+      return [];
+    },
     getTreeItem(row) {
+      if (row.kind === 'limits') {
+        const item = new vscode.TreeItem('アカウント全体の利用枠', vscode.TreeItemCollapsibleState.Expanded);
+        item.id = 'codexCompanion.accountLimits';
+        item.contextValue = 'codexAccountLimits';
+        item.description = limitsError ? (limits ? '取得失敗 / 前回値' : '取得失敗') : limitsRefreshing ? '更新中' : '約1分ごと更新';
+        item.iconPath = new vscode.ThemeIcon('account');
+        return item;
+      }
+      if (row.kind === 'limitWindow') {
+        const display = describeWindow(row.window, limits.fetchedAt, limitsError);
+        const item = new vscode.TreeItem(row.window.label);
+        item.id = `codexCompanion.limit.${row.window.id}`;
+        item.description = display.description;
+        item.tooltip = display.tooltip;
+        item.iconPath = new vscode.ThemeIcon(display.icon, new vscode.ThemeColor(display.color));
+        item.command = { command: 'codexCompanion.refreshLimits', title: '利用枠を更新' };
+        return item;
+      }
+      if (row.kind === 'notice') {
+        const item = new vscode.TreeItem(row.title);
+        item.iconPath = new vscode.ThemeIcon('info');
+        item.command = { command: 'codexCompanion.refreshLimits', title: '利用枠を更新' };
+        item.tooltip = 'クリックして利用枠を再取得します。取得できない理由は「出力 → codex-companion」で確認できます。';
+        return item;
+      }
       const item = new vscode.TreeItem(row.title || '無題の会話');
       const display = describeTelemetry(row.telemetry);
       item.description = display.description;
       item.tooltip = `${row.title}\n会話更新: ${new Date(row.time).toLocaleString()}\n\n${display.detail}`;
-      item.iconPath = new vscode.ThemeIcon(display.icon);
+      item.iconPath = new vscode.ThemeIcon(display.icon, new vscode.ThemeColor(display.color));
       item.contextValue = 'codexSession';
       item.command = { command: 'codexCompanion.open', title: '開く', arguments: [row] };
       return item;
     }
   };
+  async function refreshLimits() {
+    if (limitsRefreshing) return limitsRefreshing;
+    limitsAttemptedAt = Date.now();
+    const selectedHome = home();
+    limitsRefreshing = (async () => {
+      try {
+        const result = await backend(request => request('account/rateLimits/read', {}));
+        if (telemetryDisposed || home() !== selectedHome) return;
+        limits = parseLimits(result);
+        limitsError = undefined;
+      } catch (error) {
+        if (telemetryDisposed || home() !== selectedHome) return;
+        limitsError = error.message;
+        output.appendLine(`利用枠の取得失敗: ${error.message}`);
+      }
+    })();
+    changed.fire(limitsNode);
+    try { await limitsRefreshing; } finally {
+      limitsRefreshing = undefined;
+      if (!telemetryDisposed) changed.fire(limitsNode);
+    }
+  }
   async function updateTelemetry() {
     if (telemetryUpdating || telemetryDisposed) return;
     telemetryUpdating = true;
@@ -196,7 +261,7 @@ function activate(context) {
     new: () => openRoute('/extension/panel/new', undefined, `codexCompanion=${randomUUID()}`),
     open: openSession,
     openBeside: row => openSession(row, vscode.ViewColumn.Beside),
-    search, refresh, restore,
+    search, refresh: () => Promise.all([refresh(), refreshLimits()]), restore, refreshLimits,
     rename: row => manage(() => rename(row)),
     archive: row => manage(() => archive(row)),
     unarchive: () => manage(unarchive)
@@ -208,22 +273,31 @@ function activate(context) {
   const tree = vscode.window.createTreeView('codexCompanion.sessions', { treeDataProvider: provider });
   const telemetryTimer = setInterval(() => {
     if (tree.visible && !refreshing) updateTelemetry().catch(error => output.appendLine(String(error)));
+    if (tree.visible && Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
   }, 10000);
   context.subscriptions.push(
     changed, output,
     tree,
     tree.onDidChangeVisibility(event => {
-      if (event.visible) updateTelemetry().catch(report);
+      if (event.visible) {
+        updateTelemetry().catch(report);
+        if (Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
+      }
     }),
     vscode.window.tabGroups.onDidChangeTabs(scheduleSave),
     vscode.window.tabGroups.onDidChangeTabGroups(scheduleSave),
     vscode.workspace.onDidChangeConfiguration(event => {
-      if (event.affectsConfiguration('codexCompanion')) { watch(); refresh().catch(report); }
+      if (event.affectsConfiguration('codexCompanion')) {
+        watch(); refresh().catch(report);
+        limits = undefined; limitsError = undefined; limitsAttemptedAt = 0;
+        refreshLimits().catch(report);
+      }
     }),
     { dispose() { telemetryDisposed = true; clearInterval(telemetryTimer); clearTimeout(saveTimer); watcher?.dispose(); } }
   );
   watch();
   refresh().catch(report);
+  refreshLimits().catch(report);
 }
 
 module.exports = { activate };

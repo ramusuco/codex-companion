@@ -2,7 +2,7 @@
   "name": "codex-companion",
   "displayName": "codex-companion",
   "description": "Codex の保存済み会話を固定タブで開く、小さな補助拡張。",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "rmsc",
   "engines": {
     "vscode": "^1.96.2"
@@ -19,12 +19,18 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js",
+    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js && node --check src/limits.js",
     "package": "vsce package --no-dependencies",
     "vscode:prepublish": "npm run check && npm test"
   },
   "contributes": {
     "commands": [
+      {
+        "command": "codexCompanion.refreshLimits",
+        "title": "アカウントの利用枠を更新",
+        "category": "codex-companion",
+        "icon": "$(refresh)"
+      },
       {
         "command": "codexCompanion.new",
         "title": "新規タブを開く（試作）",
@@ -122,6 +128,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "codexCompanion.refreshLimits",
+          "when": "view == codexCompanion.sessions && viewItem == codexAccountLimits",
+          "group": "inline"
+        },
         {
           "command": "codexCompanion.openBeside",
           "when": "view == codexCompanion.sessions && viewItem == codexSession",
