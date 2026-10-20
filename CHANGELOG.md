@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Move account allowance to a dedicated Codex Usage view with percentage cards and progress bars.
+- Keep Codex Sessions flat, remove detailed hover popups, and show only muted context estimates next to titles.
+- Use English for companion commands, settings, notifications, and documentation.
+- Preserve status icons and expose their labels to screen readers.
+
 ## 0.5.0
 
 - Show account-wide remaining allowance and reset times above the session list.

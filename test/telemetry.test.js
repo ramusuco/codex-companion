@@ -16,8 +16,9 @@ test('uses last usage, not accumulated billing tokens; state labels never claim 
   const value = parseTelemetry(event({ type: 'task_started' }) + token(40, 100));
   assert.equal(value.usage.percent, 60);
   assert.equal(value.state, 'started');
-  assert.match(describeTelemetry(value, Date.parse('2026-10-21T01:00:00Z')).description, /実行状況不明/);
-  assert.doesNotMatch(describeTelemetry(value).description, /実行中/);
+  assert.equal(describeTelemetry(value, Date.parse('2026-10-21T01:00:00Z')).stateLabel, 'Activity unknown');
+  assert.equal(describeTelemetry(value).description, '~60% context left');
+  assert.equal(describeTelemetry().description, '');
   assert.equal(parseTelemetry(event({ type: 'task_complete' })).state, 'completed');
   assert.equal(parseTelemetry(event({ type: 'turn_aborted' })).state, 'interrupted');
 });
@@ -26,7 +27,7 @@ test('recent log activity uses a blue estimated spinner, becomes unknown without
   const value = parseTelemetry(event({ type: 'task_started' }) + token(40, 100));
   assert.equal(describeTelemetry(value, now).icon, 'sync~spin');
   assert.equal(describeTelemetry(value, now).color, 'charts.blue');
-  assert.match(describeTelemetry(value, now).description, /推定/);
+  assert.match(describeTelemetry(value, now).stateLabel, /estimated/);
   assert.equal(describeTelemetry(value, now + 20000).icon, 'history');
   assert.equal(describeTelemetry(value, now - 40000).icon, 'history');
   const completed = parseTelemetry(event({ type: 'task_started' }) + event({ type: 'task_complete' }));

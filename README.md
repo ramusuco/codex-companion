@@ -1,99 +1,129 @@
 # codex-companion
 
-Codex の会話をタブで開き、名前変更・検索・アーカイブを行う VS Code 補助拡張です。
-OpenAI の公式製品ではなく、公式 Codex 拡張を必要とする独立したコミュニティ製ツールです。
-公式拡張のファイル・ログイン情報を書き換えません。
-名前変更・アーカイブ・復元は公式 app-server API 経由で会話の保存状態を更新します。
+Conversation tabs, renaming, archiving, and account usage for the Codex VS Code extension.
+This is an independent community companion, not an official OpenAI product.
+Requires the official `openai.chatgpt` extension.
 
-## インストール
+## Install
 
-ビルドした `codex-companion-0.5.0.vsix` を、VS Code の拡張機能メニュー
-「… → VSIX からのインストール」で選びます。公式 `openai.chatgpt` 拡張が必要です。
+Install `codex-companion-0.6.0.vsix` using **Extensions → … → Install from VSIX**,
+then run **Developer: Reload Window**.
 
-開発時はこのフォルダを VS Code で開き、F5 で Extension Development Host を起動できます。
-旧 `local-tools.codex-tabs` は別の拡張として残るため、無効化またはアンインストールしてください。
-旧版の設定・タブ復元リストは移行されませんが、会話名やアーカイブ状態は Codex 側に残ります。
+If upgrading from the early `local-tools.codex-tabs` prototype, disable or
+uninstall that extension to avoid duplicate views. Its custom settings and
+saved tab snapshots do not migrate automatically. Conversation names and
+archive state remain in Codex.
 
-## 使い方
+## Interface
 
-- エクスプローラー内の **codex-companion** に最近の会話が表示されます。
-- 一覧上部の **アカウント全体の利用枠** に、API が返す利用枠ごとの残り％とリセット日時を表示します。
-  5時間・7日などの期間は取得値に従います。API が返さない枠は作りません。
-  表示中は約1分ごとに更新し、行のクリック・更新アイコンでも再取得できます。
-  失敗時は前回値と明示します。リセット予定時刻を過ぎても再取得まで100％には戻しません。
-- 会話をクリックするとプレビューではない固定タブで開きます。
-- 会話行の分割アイコンで右側のエディタグループに開きます。
-- 上部の **＋** で独立した新規タブを開きます（試作機能）。
-- 虫眼鏡でタイトル検索、更新ボタンで再読み込みできます。
-- 会話行に保存ログの状態とコンテキスト残量の目安を表示します。
-  マウスを重ねると残トークン数・上限・記録日時を確認できます。
-  一覧を表示している間は10秒ごとにログを再確認します。
-- 青い回転アイコン: **応答中（推定）**。開始後、直近30秒にログの活動記録があります。
-  緑のチェック: **完了記録**。黄色の一時停止: **中断記録**。
-  黄色の履歴アイコン: **実行状況不明**（開始記録はあるが活動記録が古い）。
-  色だけでなくアイコンと文字でも区別します。
-- 会話行の鉛筆で名前変更、アーカイブアイコンでアーカイブできます。
-  名前は Codex 本体に保存されます。既存の公式タブのタイトルは開き直すと反映されます。
-- ビュー上部のメニューの「アーカイブした会話を戻す」で復元できます。
-  アーカイブは確認ダイアログ付きで、派生した子会話も対象になる場合があります。
-  実行中の会話は完了してから操作してください。完全削除は実装していません。
-- ビュー上部のメニューから「前回開いていた会話タブを復元」を実行できます。
+Two independent views appear in Explorer:
 
-## 制約
+- **Codex Usage** shows account-wide allowance as cards with large remaining
+  percentages, progress bars, and reset times. The refresh button is in its
+  header. It refreshes about once per minute while visible.
+- **Codex Sessions** shows a flat conversation list. Each row has a status icon
+  and a muted context estimate such as `~62% context left`, with no detailed
+  hover popup. Unknown context is left blank.
 
-- 状態表示は**保存ログからの推定**です。「応答中（推定）」は現在の実行継続を保証しません。
-  「完了記録」「中断記録」も最新の保存イベントを表し、承認待ちや現在の接続状況は判別できません。
-  別の管理プロセスが返す `notLoaded` を待機中として表示することはありません。
-- アカウントの利用枠は `account/rateLimits/read` から取得します。公式 Codex で認証済みの
-  アカウントの値で、プランによっては取得できません。正確な残トークン数は提供されません。
-  取得日時や残量が古い場合の注意はマウスを重ねると確認できます。
-- コンテキスト残量は `model_context_window - last_token_usage.total_tokens` の概算です。
-  累積トークン消費量や契約の残り利用枠ではありません。
-  新しい入力・未記録の出力・内部予約分は反映しません。
-  圧縮イベントを見つけたら次の使用量記録まで残量を不明にします。
-- 各ログの末尾最大1 MiBだけを読み、本文は表示・保存しません。
-  上限や使用量の記録がこの範囲にない場合や、ログを読めない環境では「不明」と表示します。
-  自動更新は既知の会話ログのみで、新しい会話の検出は更新ボタンまたは一覧インデックスの変更時に行います。
+Drag either view header to another sidebar or panel using VS Code's normal
+view controls. Conversation titles remain in their original language.
+Companion controls, settings, and notifications use English.
 
-- 公式拡張の非公開 URI `openai-codex://route/local/<id>` とカスタムエディタを利用します。
-  インストール済み `26.1007.21434` の実装を確認して作成していますが、将来変更される可能性があります。
-- 新規タブは `/extension/panel/new` に固有のクエリを付ける試作方式です。
-  公式 UI 内の「新規会話」ボタンは従来の挙動のままです。
-- **チュートリアルの繰り返しや公式 UI 内部の状態消失は修正しません。**
-  既存会話は一覧から再度開けます。
-- 復元対象は `/local/<id>` に結びついた会話タブのみです。
-  新規タブがその URI に移行しない場合、そのタブは復元対象になりません。
-  保存後に一覧から会話を開き直すと対象になります。
-- 復元は手動です。最後の空でないタブ一覧をワークスペース単位で保存します。
-  全タブを手動で閉じた場合も最後の一覧を残します。
-- 会話一覧は公式 app-server の `thread/list` から取得します。
-  名前変更は `thread/name/set`、アーカイブは `thread/archive`、復元は `thread/unarchive` です。
-  API への接続に失敗した場合だけ `session_index.jsonl` を表示し、出力「codex-companion」に理由を記録します。
-  この代替表示にはアーカイブ済み・古い会話が残ることがあります。
-  ワークスペースによる絞り込みはありません。
-- WSL / SSH 内の会話は、その環境で実行するか `codexCompanion.codexHome` で参照先を指定してください。
-  ファイルが読めても、公式拡張が別環境で実行している会話を再開できるとは限りません。
-  Windows で公式拡張の WSL モードを使っている場合、管理 API 操作はエラーにして誤った環境の更新を防ぎます。
+### Conversation actions
 
-## 検証
+- Click a conversation to open a pinned editor tab.
+- Use the split icon to open it to the side.
+- Use **+** for an independent new tab (experimental), or search by title.
+- Use the pencil to rename a conversation in Codex. Reopen existing Codex tabs
+  to update their titles.
+- Use the archive icon to archive a conversation after confirmation.
+  Spawned child conversations may also be archived; wait for active work to
+  finish first.
+- The view menu includes **Restore Archived Conversation** and
+  **Restore Previous Tabs**. Permanent deletion is not implemented.
 
-`npm test` はインデックスの重複、更新順序、不完全な末尾、欠損ファイル、不正 ID を検証します。
-Node.js 22 以降で `npm ci` 後、`npm run check` で構文検査、
-`npm run package` で公式ツール `vsce` により VSIX を生成します。
-環境変数 `CODEX_COMPANION_TEST_BINARY` に Codex 実行ファイルを指定して `npm test` を実行すると、
-独立した一時 CODEX_HOME の人工会話で名前変更・アーカイブ・復元・エラー応答を検証します。
-実会話や認証情報は使用せず、モデルへのリクエストも発行しません。
+### Status icons
 
-実機確認: 既存会話を二つ開く → ファイルタブへ移る → 会話へ戻る →
-新規タブを二つ開く → 保存済み会話の復元を試す。
-チャットの送信・モデル実行は通常どおり公式 Codex が担当します。
+| Icon | Meaning |
+| --- | --- |
+| Blue spinner | Response activity estimated from a start record and log activity within 30 seconds |
+| Green check | Completion recorded |
+| Yellow pause | Interruption recorded |
+| Yellow history | Start recorded, but recent activity is unavailable |
+| Gray question | No readable status record |
 
-## 公開・データの扱い
+Status comes from saved logs, not a live connection to the official extension.
+Approval waits and actual process liveness cannot be determined. Screen readers
+receive the status label even though the row displays only the icon.
 
-公開手順は [PUBLISHING.md](PUBLISHING.md) を参照してください。
-この拡張独自の利用状況収集はありません。会話一覧の取得・名前変更・アーカイブ・利用枠の取得は
-ローカルの Codex app-server を介します。利用枠の取得時には公式 Codex からサービスへの通信が発生します。
-公式 Codex 自体の通信・データ処理は公式側の設定に従います。
-タブ復元用の会話 ID と表示位置を VS Code のワークスペース状態に保存します。
+## Allowance and context are different
 
-ライセンス: [MIT](LICENSE)。
+**Codex Usage** reads `account/rateLimits/read`. It uses the actual windows
+returned by the service, such as a 5-hour or 7-day limit, rather than assuming
+a particular subscription. Missing limits remain unavailable. Stale results
+are labeled **Last known value**, and passing a reset time does not
+automatically restore the display to 100%. Exact remaining token counts are
+not provided by this API.
+
+**Session context** is an estimate of
+`model_context_window - last_token_usage.total_tokens`, not accumulated billed
+tokens or account allowance. New input, unrecorded output, and internal reserved
+capacity are not included. After a recorded compaction it remains unknown until
+a new usage record appears.
+
+Only the last 1 MiB of each session log is read, with caching and a 10-second
+refresh while the session view is visible. If relevant records are outside
+that range or inaccessible, the metric is unknown. New conversations are
+discovered by refreshing the list or when the session index changes.
+
+## Compatibility and limitations
+
+- Verified locally on Windows x64 with Codex `26.1007.21434`.
+- Editor integration uses the private route
+  `openai-codex://route/local/<id>` and the official custom editor. Future
+  Codex versions may change these interfaces.
+- New tabs use a unique query on `/extension/panel/new`. The official UI's
+  own New Chat action keeps its original behavior.
+- Repeated onboarding and state loss inside the official UI are not fixed.
+- Tab restoration is manual and covers tabs bound to `/local/<id>`. If a new
+  tab remains a placeholder, reopen its saved conversation from the list.
+  The last nonempty tab snapshot is kept, even if all tabs are closed manually.
+- Conversations are not filtered by workspace.
+- If the session API fails, the local `session_index.jsonl` is used as a
+  fallback. It may include stale or archived entries. See the output channel
+  **codex-companion** for errors.
+- For WSL or SSH, use the extension in the matching remote environment.
+  `codexCompanion.codexHome` can select a data directory, but being able to read
+  a file does not guarantee the official extension can resume that session.
+  Windows management operations reject the official extension's WSL mode to
+  avoid updating the wrong environment.
+
+## Development
+
+Use Node.js 22 or later:
+
+```sh
+npm ci
+npm run check
+npm test
+npm run package
+```
+
+Open this folder in VS Code and press F5 to launch the Extension Development Host.
+Set `CODEX_COMPANION_TEST_BINARY` to a Codex executable to enable the integration
+test. It uses a synthetic conversation in an isolated temporary `CODEX_HOME`
+to verify rename, archive, and restoration without real conversations,
+credentials, or model requests.
+
+Publishing instructions: [PUBLISHING.md](PUBLISHING.md).
+
+## Data and license
+
+No custom usage analytics are collected. Conversation management and allowance
+queries go through local Codex app-server. Allowance queries cause official
+Codex to contact its service; its own data handling follows its settings.
+Only conversation IDs and editor positions for tab restoration are stored in
+VS Code workspace state. Conversation bodies are not displayed by the companion.
+The usage view uses no scripts or external resources.
+
+[MIT License](LICENSE)

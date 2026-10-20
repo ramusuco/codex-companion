@@ -6,7 +6,8 @@ const { readSessions, conversationPath, UUID } = require('./sessions');
 const { withServer, listSessions } = require('./backend');
 const fs = require('node:fs');
 const { TelemetryReader, describeTelemetry } = require('./telemetry');
-const { parseLimits, describeWindow } = require('./limits');
+const { parseLimits } = require('./limits');
+const { UsageView } = require('./usage-view');
 
 function activate(context) {
   const changed = new vscode.EventEmitter();
@@ -23,20 +24,23 @@ function activate(context) {
   let limitsError;
   let limitsRefreshing;
   let limitsAttemptedAt = 0;
-  const limitsNode = { kind: 'limits' };
+  const usageView = new UsageView(
+    () => ({ limits, error: limitsError, refreshing: Boolean(limitsRefreshing) }),
+    () => { if (Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report); }
+  );
   const config = () => vscode.workspace.getConfiguration('codexCompanion');
   const home = () => config().get('codexHome') || process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
   const output = vscode.window.createOutputChannel('codex-companion');
   function backend(action) {
     const extension = vscode.extensions.getExtension('openai.chatgpt');
-    if (!extension) throw new Error('公式 Codex 拡張が必要です。');
+    if (!extension) throw new Error('The official Codex extension is required.');
     if (process.platform === 'win32' && vscode.workspace.getConfiguration('chatgpt').get('runCodexInWindowsSubsystemForLinux')) {
-      throw new Error('WSL の会話管理は WSL 側の VS Code ウィンドウで実行してください。');
+      throw new Error('Manage WSL conversations from a VS Code window connected to WSL.');
     }
     const platform = { win32: 'windows', darwin: 'macos', linux: 'linux' }[process.platform];
     const arch = process.arch === 'arm64' ? 'aarch64' : 'x86_64';
     const binary = path.join(extension.extensionPath, 'bin', `${platform}-${arch}`, process.platform === 'win32' ? 'codex.exe' : 'codex');
-    if (!fs.existsSync(binary)) throw new Error('公式拡張の Codex 実行ファイルが見つかりません。');
+    if (!fs.existsSync(binary)) throw new Error('The Codex executable could not be found in the official extension.');
     return withServer(binary, home(), action);
   }
   const report = (error) => {
@@ -45,52 +49,16 @@ function activate(context) {
   };
   const provider = {
     onDidChangeTreeData: changed.event,
-    getChildren(row) {
-      if (!row) return [limitsNode, ...sessions];
-      if (row.kind === 'limits') {
-        const children = (limits?.windows || []).map(window => ({ kind: 'limitWindow', window }));
-        if (limits?.usageBlocked) children.unshift({ kind: 'notice', title: '現在、通常の利用が制限されています' });
-        if (!children.length) children.push({
-          kind: 'notice',
-          title: limitsError ? '利用枠を取得できませんでした' : limitsRefreshing ? '利用枠を取得中…' : '利用枠の情報がありません'
-        });
-        return children;
-      }
-      return [];
-    },
+    getChildren: row => row ? [] : sessions,
     getTreeItem(row) {
-      if (row.kind === 'limits') {
-        const item = new vscode.TreeItem('アカウント全体の利用枠', vscode.TreeItemCollapsibleState.Expanded);
-        item.id = 'codexCompanion.accountLimits';
-        item.contextValue = 'codexAccountLimits';
-        item.description = limitsError ? (limits ? '取得失敗 / 前回値' : '取得失敗') : limitsRefreshing ? '更新中' : '約1分ごと更新';
-        item.iconPath = new vscode.ThemeIcon('account');
-        return item;
-      }
-      if (row.kind === 'limitWindow') {
-        const display = describeWindow(row.window, limits.fetchedAt, limitsError);
-        const item = new vscode.TreeItem(row.window.label);
-        item.id = `codexCompanion.limit.${row.window.id}`;
-        item.description = display.description;
-        item.tooltip = display.tooltip;
-        item.iconPath = new vscode.ThemeIcon(display.icon, new vscode.ThemeColor(display.color));
-        item.command = { command: 'codexCompanion.refreshLimits', title: '利用枠を更新' };
-        return item;
-      }
-      if (row.kind === 'notice') {
-        const item = new vscode.TreeItem(row.title);
-        item.iconPath = new vscode.ThemeIcon('info');
-        item.command = { command: 'codexCompanion.refreshLimits', title: '利用枠を更新' };
-        item.tooltip = 'クリックして利用枠を再取得します。取得できない理由は「出力 → codex-companion」で確認できます。';
-        return item;
-      }
-      const item = new vscode.TreeItem(row.title || '無題の会話');
+      const item = new vscode.TreeItem(row.title || 'Untitled conversation');
       const display = describeTelemetry(row.telemetry);
       item.description = display.description;
-      item.tooltip = `${row.title}\n会話更新: ${new Date(row.time).toLocaleString()}\n\n${display.detail}`;
+      item.tooltip = '';
+      item.accessibilityInformation = { label: `${row.title || 'Untitled conversation'}, ${display.stateLabel}, ${display.description}` };
       item.iconPath = new vscode.ThemeIcon(display.icon, new vscode.ThemeColor(display.color));
       item.contextValue = 'codexSession';
-      item.command = { command: 'codexCompanion.open', title: '開く', arguments: [row] };
+      item.command = { command: 'codexCompanion.open', title: 'Open', arguments: [row] };
       return item;
     }
   };
@@ -107,13 +75,13 @@ function activate(context) {
       } catch (error) {
         if (telemetryDisposed || home() !== selectedHome) return;
         limitsError = error.message;
-        output.appendLine(`利用枠の取得失敗: ${error.message}`);
+        output.appendLine(`Failed to fetch account allowance: ${error.message}`);
       }
     })();
-    changed.fire(limitsNode);
+    usageView.update();
     try { await limitsRefreshing; } finally {
       limitsRefreshing = undefined;
-      if (!telemetryDisposed) changed.fire(limitsNode);
+      if (!telemetryDisposed) usageView.update();
     }
   }
   async function updateTelemetry() {
@@ -137,7 +105,7 @@ function activate(context) {
       try {
         sessions = await backend(request => listSessions(request, config().get('maxSessions', 200)));
       } catch (error) {
-        output.appendLine(`会話管理 API の取得失敗（インデックスを表示）: ${error.message}`);
+        output.appendLine(`Session API unavailable; using the local index: ${error.message}`);
         sessions = await readSessions(path.join(home(), 'session_index.jsonl'), config().get('maxSessions', 200));
       }
       await updateTelemetry();
@@ -147,7 +115,7 @@ function activate(context) {
   }
   async function openRoute(route, column, query = '') {
     const extension = vscode.extensions.getExtension('openai.chatgpt');
-    if (!extension) throw new Error('公式 Codex 拡張（openai.chatgpt）が必要です。');
+    if (!extension) throw new Error('The official Codex extension (openai.chatgpt) is required.');
     await extension.activate();
     const uri = vscode.Uri.from({ scheme: 'openai-codex', authority: 'route', path: route, query });
     await vscode.commands.executeCommand('vscode.openWith', uri, 'chatgpt.conversationEditor', {
@@ -163,9 +131,9 @@ function activate(context) {
   async function search() {
     await refresh();
     const selected = await vscode.window.showQuickPick(sessions.map(row => ({
-      label: row.title || '無題の会話',
+      label: row.title || 'Untitled conversation',
       description: describeTelemetry(row.telemetry).description, row
-    })), { placeHolder: '保存済みの Codex 会話を検索', matchOnDescription: true });
+    })), { placeHolder: 'Search saved Codex conversations', matchOnDescription: true });
     if (selected) await openSession(selected.row);
   }
   async function manage(action) {
@@ -177,23 +145,23 @@ function activate(context) {
     if (!row) return;
     conversationPath(row.id);
     const name = await vscode.window.showInputBox({
-      title: 'Codex の会話名を変更', value: row.title,
-      validateInput: value => value.trim() ? undefined : '名前を入力してください。'
+      title: 'Rename Codex Conversation', value: row.title,
+      validateInput: value => value.trim() ? undefined : 'Enter a name.'
     });
     if (name === undefined || name.trim() === row.title) return;
     await backend(request => request('thread/name/set', { threadId: row.id, name: name.trim() }));
     if (refreshing) await refreshing;
     await refresh();
-    vscode.window.showInformationMessage('会話名を変更しました。開いている公式タブのタイトルは、開き直すと反映されます。');
+    vscode.window.showInformationMessage('Conversation renamed. Reopen any existing Codex tab to update its title.');
   }
   async function archive(row) {
     if (!row) return;
     conversationPath(row.id);
     const answer = await vscode.window.showWarningMessage(
-      `「${row.title}」をアーカイブしますか？`,
-      { modal: true, detail: '派生した子会話も対象になる場合があります。実行中の会話は完了を待ってください。アーカイブした会話を戻す操作も用意しています。' },
-      'アーカイブ');
-    if (answer !== 'アーカイブ') return;
+      `Archive "${row.title}"?`,
+      { modal: true, detail: 'Spawned child conversations may also be archived. Wait for active work to finish. You can restore archived conversations later.' },
+      'Archive');
+    if (answer !== 'Archive') return;
     await backend(request => request('thread/archive', { threadId: row.id }));
     await context.workspaceState.update('openSessions',
       context.workspaceState.get('openSessions', []).filter(item => item.id !== row.id));
@@ -205,9 +173,9 @@ function activate(context) {
   }
   async function unarchive() {
     const archived = await backend(request => listSessions(request, config().get('maxSessions', 200), true));
-    if (!archived.length) { vscode.window.showInformationMessage('アーカイブ済みの会話はありません。'); return; }
+    if (!archived.length) { vscode.window.showInformationMessage('No archived conversations.'); return; }
     const selected = await vscode.window.showQuickPick(archived.map(row => ({ label: row.title, row })),
-      { placeHolder: 'アーカイブから戻す会話を選択' });
+      { placeHolder: 'Choose an archived conversation to restore' });
     if (!selected) return;
     conversationPath(selected.row.id);
     await backend(request => request('thread/unarchive', { threadId: selected.row.id }));
@@ -238,7 +206,7 @@ function activate(context) {
   async function restore() {
     const saved = context.workspaceState.get('openSessions', []);
     if (!saved.length) {
-      vscode.window.showInformationMessage('復元できる会話タブはまだありません。');
+      vscode.window.showInformationMessage('No saved conversation tabs to restore.');
       return;
     }
     restoring = true;
@@ -273,15 +241,15 @@ function activate(context) {
   const tree = vscode.window.createTreeView('codexCompanion.sessions', { treeDataProvider: provider });
   const telemetryTimer = setInterval(() => {
     if (tree.visible && !refreshing) updateTelemetry().catch(error => output.appendLine(String(error)));
-    if (tree.visible && Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
+    if (usageView.visible && Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
   }, 10000);
   context.subscriptions.push(
     changed, output,
     tree,
+    vscode.window.registerWebviewViewProvider('codexCompanion.usage', usageView),
     tree.onDidChangeVisibility(event => {
       if (event.visible) {
         updateTelemetry().catch(report);
-        if (Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
       }
     }),
     vscode.window.tabGroups.onDidChangeTabs(scheduleSave),

@@ -1,8 +1,8 @@
 {
   "name": "codex-companion",
   "displayName": "codex-companion",
-  "description": "Codex の保存済み会話を固定タブで開く、小さな補助拡張。",
-  "version": "0.5.0",
+  "description": "A companion for Codex: conversation tabs, renaming, archiving, and account usage.",
+  "version": "0.6.0",
   "publisher": "rmsc",
   "engines": {
     "vscode": "^1.96.2"
@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js && node --check src/limits.js",
+    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js && node --check src/limits.js && node --check src/usage-view.js",
     "package": "vsce package --no-dependencies",
     "vscode:prepublish": "npm run check && npm test"
   },
@@ -27,60 +27,60 @@
     "commands": [
       {
         "command": "codexCompanion.refreshLimits",
-        "title": "アカウントの利用枠を更新",
+        "title": "Refresh Account Usage",
         "category": "codex-companion",
         "icon": "$(refresh)"
       },
       {
         "command": "codexCompanion.new",
-        "title": "新規タブを開く（試作）",
+        "title": "New Conversation Tab (Experimental)",
         "category": "codex-companion",
         "icon": "$(add)"
       },
       {
         "command": "codexCompanion.search",
-        "title": "会話を検索してタブで開く",
+        "title": "Search Conversations",
         "category": "codex-companion",
         "icon": "$(search)"
       },
       {
         "command": "codexCompanion.refresh",
-        "title": "会話一覧を更新",
+        "title": "Refresh Conversations",
         "category": "codex-companion",
         "icon": "$(refresh)"
       },
       {
         "command": "codexCompanion.open",
-        "title": "会話をタブで開く",
+        "title": "Open Conversation",
         "category": "codex-companion"
       },
       {
         "command": "codexCompanion.openBeside",
-        "title": "会話を右側に開く",
+        "title": "Open to the Side",
         "category": "codex-companion",
         "icon": "$(split-horizontal)"
       },
       {
         "command": "codexCompanion.restore",
-        "title": "前回開いていた会話タブを復元",
+        "title": "Restore Previous Tabs",
         "category": "codex-companion",
         "icon": "$(history)"
       },
       {
         "command": "codexCompanion.rename",
-        "title": "名前を変更",
+        "title": "Rename Conversation",
         "category": "codex-companion",
         "icon": "$(edit)"
       },
       {
         "command": "codexCompanion.archive",
-        "title": "会話をアーカイブ",
+        "title": "Archive Conversation",
         "category": "codex-companion",
         "icon": "$(archive)"
       },
       {
         "command": "codexCompanion.unarchive",
-        "title": "アーカイブした会話を戻す",
+        "title": "Restore Archived Conversation",
         "category": "codex-companion",
         "icon": "$(discard)"
       }
@@ -88,15 +88,20 @@
     "views": {
       "explorer": [
         {
+          "id": "codexCompanion.usage",
+          "name": "Codex Usage",
+          "type": "webview"
+        },
+        {
           "id": "codexCompanion.sessions",
-          "name": "codex-companion"
+          "name": "Codex Sessions"
         }
       ]
     },
     "viewsWelcome": [
       {
         "view": "codexCompanion.sessions",
-        "contents": "保存済みの会話がまだありません。\n[新規タブを開く](command:codexCompanion.new)\n[一覧を更新](command:codexCompanion.refresh)\n別の環境の会話は設定の Codex Home を確認してください。"
+        "contents": "No saved conversations yet.\n[New Conversation Tab](command:codexCompanion.new)\n[Refresh Conversations](command:codexCompanion.refresh)\nCheck the Codex Home setting if your conversations are stored elsewhere."
       }
     ],
     "menus": {
@@ -125,14 +130,14 @@
           "command": "codexCompanion.unarchive",
           "when": "view == codexCompanion.sessions",
           "group": "actions"
+        },
+        {
+          "command": "codexCompanion.refreshLimits",
+          "when": "view == codexCompanion.usage",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
-        {
-          "command": "codexCompanion.refreshLimits",
-          "when": "view == codexCompanion.sessions && viewItem == codexAccountLimits",
-          "group": "inline"
-        },
         {
           "command": "codexCompanion.openBeside",
           "when": "view == codexCompanion.sessions && viewItem == codexSession",
@@ -181,14 +186,14 @@
         "codexCompanion.codexHome": {
           "type": "string",
           "default": "",
-          "description": "会話一覧を読む Codex ディレクトリ。空なら CODEX_HOME または ~/.codex。"
+          "description": "Codex data directory. Defaults to CODEX_HOME or ~/.codex."
         },
         "codexCompanion.maxSessions": {
           "type": "number",
           "default": 200,
           "minimum": 1,
           "maximum": 5000,
-          "description": "一覧に表示する最近の会話数。"
+          "description": "Maximum number of recent conversations to display."
         }
       }
     }

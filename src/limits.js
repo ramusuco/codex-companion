@@ -1,8 +1,8 @@
 function windowLabel(minutes, fallback) {
   if (!Number.isFinite(minutes) || minutes <= 0) return fallback;
-  if (minutes % 1440 === 0) return `${minutes / 1440}日枠`;
-  if (minutes % 60 === 0) return `${minutes / 60}時間枠`;
-  return `${minutes}分枠`;
+  if (minutes % 1440 === 0) return `${minutes / 1440}-day limit`;
+  if (minutes % 60 === 0) return `${minutes / 60}-hour limit`;
+  return `${minutes}-minute limit`;
 }
 
 function parseLimits(response, now = Date.now()) {
@@ -22,7 +22,7 @@ function parseLimits(response, now = Date.now()) {
       const reset = window.resetsAt;
       windows.push({
         id: `${id}:${name}`,
-        label: `${bucket.limitName || id} · ${windowLabel(window.windowDurationMins, name === 'primary' ? '利用枠1' : '利用枠2')}`,
+        label: `${bucket.limitName || id} · ${windowLabel(window.windowDurationMins, name === 'primary' ? 'Primary limit' : 'Secondary limit')}`,
         remaining,
         resetsAt: typeof reset === 'number' && Number.isFinite(reset) && reset > 0 &&
           Number.isFinite(new Date(reset * 1000).getTime()) ? reset * 1000 : null
@@ -35,20 +35,21 @@ function parseLimits(response, now = Date.now()) {
 function describeWindow(window, fetchedAt, error, now = Date.now()) {
   const expired = window.resetsAt !== null && window.resetsAt <= now;
   const stale = Boolean(error) || expired || now - fetchedAt > 120000;
-  const amount = window.remaining === null ? '残量不明' : `残り ${window.remaining}%`;
-  const reset = window.resetsAt === null ? 'リセット時刻不明' : new Date(window.resetsAt).toLocaleString();
+  const amount = window.remaining === null ? 'Allowance unknown' : `${window.remaining}% remaining`;
+  const reset = window.resetsAt === null ? 'Unknown' : new Date(window.resetsAt).toLocaleString('en-US');
   return {
-    description: `${amount}${stale ? '（前回取得）' : ''} · リセット ${reset}`,
+    stale,
+    description: `${amount}${stale ? ' (last known)' : ''} · Resets ${reset}`,
     icon: stale || window.remaining === null ? 'warning' : 'dashboard',
     color: stale || window.remaining === null || window.remaining <= 20
       ? 'charts.yellow' : 'charts.green',
     tooltip: [
-      'アカウントの利用枠です。会話のコンテキスト残量とは別です。',
-      `取得: ${new Date(fetchedAt).toLocaleString()}`,
-      `リセット: ${reset}`,
-      '残り割合 = 100 − API の使用率。正確な残トークン数は提供されません。',
-      expired ? 'リセット予定時刻を過ぎています。新しい取得に成功するまで残量は確定できません。' : '',
-      error ? '再取得に失敗しました。表示は前回の値です。' : ''
+      'Account allowance, separate from conversation context.',
+      `Updated: ${new Date(fetchedAt).toLocaleString('en-US')}`,
+      `Resets: ${reset}`,
+      'Remaining percentage = 100 minus API usage. Exact remaining tokens are not available.',
+      expired ? 'The expected reset time has passed. Refresh to retrieve the new allowance.' : '',
+      error ? 'Refresh failed. Showing the last known value.' : ''
     ].filter(Boolean).join('\n')
   };
 }

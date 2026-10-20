@@ -31,7 +31,7 @@ async function readSessions(file, limit = 200) {
 }
 
 function conversationPath(id) {
-  if (!UUID.test(id)) throw new Error('会話 ID が不正です。');
+  if (!UUID.test(id)) throw new Error('Invalid conversation ID.');
   return `/local/${id}`;
 }
 

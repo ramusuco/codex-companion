@@ -73,28 +73,17 @@ function describeTelemetry(data = {}, now = Date.now()) {
   const recent = Number.isFinite(activity) && now - activity >= 0 && now - activity <= 30000;
   const state = {
     started: recent
-      ? ['応答中（推定）', 'sync~spin', 'charts.blue']
-      : ['実行状況不明', 'history', 'charts.yellow'],
-    completed: ['完了記録', 'pass-filled', 'charts.green'],
-    interrupted: ['中断記録', 'debug-pause', 'charts.yellow']
-  }[data.state] || ['状態不明', 'question', 'disabledForeground'];
+      ? ['Responding (estimated)', 'sync~spin', 'charts.blue']
+      : ['Activity unknown', 'history', 'charts.yellow'],
+    completed: ['Completion recorded', 'pass-filled', 'charts.green'],
+    interrupted: ['Interruption recorded', 'debug-pause', 'charts.yellow']
+  }[data.state] || ['Status unknown', 'question', 'disabledForeground'];
   const usage = data.usage;
-  const date = value => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : '不明';
   return {
-    description: `${state[0]} · ${usage ? `文脈残 約${usage.percent}%` : '文脈残量不明'}`,
+    description: usage ? `~${usage.percent}% context left` : '',
+    stateLabel: state[0],
     icon: state[1],
-    color: state[2],
-    detail: [
-      `状態: ${state[0]}（保存ログ）`,
-      `状態の記録日時: ${date(data.stateAt)}`,
-      `ログの活動記録: ${date(data.activityAt)}`,
-      '「応答中（推定）」は開始後30秒以内にログ活動がある場合です。接続や実行を直接確認した状態ではありません。',
-      '開始記録だけでは現在の実行継続・承認待ち・停止を判別できません。',
-      usage
-        ? `コンテキスト残量の目安: ${usage.remaining.toLocaleString()} / ${usage.limit.toLocaleString()} tokens（約${usage.percent}%）\n直近の使用量: ${usage.used.toLocaleString()} tokens\n使用量の記録日時: ${date(usage.at)}`
-        : 'コンテキスト残量: 取得できる記録がありません。',
-      '契約の利用枠ではありません。最新記録の上限−直近使用量で計算し、送信前の入力・圧縮・内部予約分は反映しない目安です。'
-    ].join('\n')
+    color: state[2]
   };
 }
 

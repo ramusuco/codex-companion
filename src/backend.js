@@ -16,7 +16,7 @@ async function withServer(executable, home, action) {
     pending.clear();
   };
   child.on('error', fail);
-  child.on('exit', () => fail(new Error('Codex 管理プロセスが終了しました。')));
+  child.on('exit', () => fail(new Error('The Codex management process exited.')));
   child.stdin.on('error', fail);
   child.stderr.resume();
   const lines = readline.createInterface({ input: child.stdout });
@@ -40,7 +40,7 @@ async function withServer(executable, home, action) {
     const id = nextId++;
     const timer = setTimeout(() => {
       pending.delete(id);
-      reject(new Error(`Codex ${method} がタイムアウトしました。一覧を更新して状態を確認してください。`));
+      reject(new Error(`Codex ${method} timed out. Refresh to check the current state.`));
     }, 20000);
     pending.set(id, { resolve, reject, timer });
     send({ id, method, params });
@@ -66,7 +66,7 @@ async function listSessions(request, limit, archived = false) {
       archived, sortKey: 'updated_at', sourceKinds: [], modelProviders: []
     });
     rows.push(...result.data.map(row => ({
-      id: row.id, title: row.name || row.preview || '無題の会話',
+      id: row.id, title: row.name || row.preview || 'Untitled conversation',
       time: row.updatedAt * 1000, rolloutPath: row.path
     })));
     cursor = result.nextCursor;
