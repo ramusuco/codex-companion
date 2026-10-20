@@ -4,6 +4,10 @@ Conversation tabs, renaming, archiving, and account usage for the Codex VS Code 
 This is an independent community companion, not an official OpenAI product.
 Requires the official `openai.chatgpt` extension.
 
+![codex-companion panel with account allowance, conversation status, context estimates, and conversation actions](image.png)
+
+*Sample conversations and illustrative context estimates.*
+
 ## Install
 
 Install `codex-companion-0.7.0.vsix` using **Extensions → … → Install from VSIX**,

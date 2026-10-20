@@ -192,6 +192,7 @@
   "files": [
     "src/**",
     "README.md",
+    "image.png",
     "CHANGELOG.md",
     "LICENSE"
   ],
