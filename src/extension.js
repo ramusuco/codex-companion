@@ -5,6 +5,7 @@ const { randomUUID } = require('node:crypto');
 const { readSessions, conversationPath, UUID } = require('./sessions');
 const { withServer, listSessions } = require('./backend');
 const fs = require('node:fs');
+const { TelemetryReader, describeTelemetry } = require('./telemetry');
 
 function activate(context) {
   const changed = new vscode.EventEmitter();
@@ -14,6 +15,9 @@ function activate(context) {
   let saveTimer;
   let watcher;
   let managing = false;
+  let telemetryUpdating = false;
+  let telemetryDisposed = false;
+  const telemetryReader = new TelemetryReader();
   const config = () => vscode.workspace.getConfiguration('codexCompanion');
   const home = () => config().get('codexHome') || process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
   const output = vscode.window.createOutputChannel('codex-companion');
@@ -38,14 +42,30 @@ function activate(context) {
     getChildren: () => sessions,
     getTreeItem(row) {
       const item = new vscode.TreeItem(row.title || '無題の会話');
-      item.description = new Date(row.time).toLocaleDateString();
-      item.tooltip = `${row.title}\n${new Date(row.time).toLocaleString()}`;
-      item.iconPath = new vscode.ThemeIcon('comment-discussion');
+      const display = describeTelemetry(row.telemetry);
+      item.description = display.description;
+      item.tooltip = `${row.title}\n会話更新: ${new Date(row.time).toLocaleString()}\n\n${display.detail}`;
+      item.iconPath = new vscode.ThemeIcon(display.icon);
       item.contextValue = 'codexSession';
       item.command = { command: 'codexCompanion.open', title: '開く', arguments: [row] };
       return item;
     }
   };
+  async function updateTelemetry() {
+    if (telemetryUpdating || telemetryDisposed) return;
+    telemetryUpdating = true;
+    const snapshot = sessions;
+    let index = 0;
+    try {
+      await Promise.all(Array.from({ length: 4 }, async () => {
+        while (index < snapshot.length && !telemetryDisposed) {
+          const row = snapshot[index++];
+          row.telemetry = await telemetryReader.read(row.rolloutPath, home());
+        }
+      }));
+      if (!telemetryDisposed) changed.fire();
+    } finally { telemetryUpdating = false; }
+  }
   async function refresh() {
     if (refreshing) return refreshing;
     refreshing = (async () => {
@@ -55,6 +75,7 @@ function activate(context) {
         output.appendLine(`会話管理 API の取得失敗（インデックスを表示）: ${error.message}`);
         sessions = await readSessions(path.join(home(), 'session_index.jsonl'), config().get('maxSessions', 200));
       }
+      await updateTelemetry();
       changed.fire();
     })();
     try { await refreshing; } finally { refreshing = undefined; }
@@ -78,7 +99,7 @@ function activate(context) {
     await refresh();
     const selected = await vscode.window.showQuickPick(sessions.map(row => ({
       label: row.title || '無題の会話',
-      description: new Date(row.time).toLocaleString(), row
+      description: describeTelemetry(row.telemetry).description, row
     })), { placeHolder: '保存済みの Codex 会話を検索', matchOnDescription: true });
     if (selected) await openSession(selected.row);
   }
@@ -184,15 +205,22 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand(`codexCompanion.${name}`,
       (...args) => Promise.resolve().then(() => handler(...args)).catch(report)));
   }
+  const tree = vscode.window.createTreeView('codexCompanion.sessions', { treeDataProvider: provider });
+  const telemetryTimer = setInterval(() => {
+    if (tree.visible && !refreshing) updateTelemetry().catch(error => output.appendLine(String(error)));
+  }, 10000);
   context.subscriptions.push(
     changed, output,
-    vscode.window.registerTreeDataProvider('codexCompanion.sessions', provider),
+    tree,
+    tree.onDidChangeVisibility(event => {
+      if (event.visible) updateTelemetry().catch(report);
+    }),
     vscode.window.tabGroups.onDidChangeTabs(scheduleSave),
     vscode.window.tabGroups.onDidChangeTabGroups(scheduleSave),
     vscode.workspace.onDidChangeConfiguration(event => {
       if (event.affectsConfiguration('codexCompanion')) { watch(); refresh().catch(report); }
     }),
-    { dispose() { clearTimeout(saveTimer); watcher?.dispose(); } }
+    { dispose() { telemetryDisposed = true; clearInterval(telemetryTimer); clearTimeout(saveTimer); watcher?.dispose(); } }
   );
   watch();
   refresh().catch(report);

@@ -2,7 +2,7 @@
   "name": "codex-companion",
   "displayName": "codex-companion",
   "description": "Codex の保存済み会話を固定タブで開く、小さな補助拡張。",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "rmsc",
   "engines": {
     "vscode": "^1.96.2"
@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js",
+    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js",
     "package": "vsce package --no-dependencies",
     "vscode:prepublish": "npm run check && npm test"
   },

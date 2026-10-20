@@ -67,7 +67,7 @@ async function listSessions(request, limit, archived = false) {
     });
     rows.push(...result.data.map(row => ({
       id: row.id, title: row.name || row.preview || '無題の会話',
-      time: row.updatedAt * 1000
+      time: row.updatedAt * 1000, rolloutPath: row.path
     })));
     cursor = result.nextCursor;
   } while (cursor && rows.length < limit);

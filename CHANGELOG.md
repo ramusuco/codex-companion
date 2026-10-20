@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Display recorded session lifecycle and estimated remaining context in the session list.
+- Show token counts, context limit, and record timestamps on hover.
+- Refresh log metrics every 10 seconds while the view is visible, with bounded reads and caching.
+- Explicitly label unavailable metrics and recorded (not live) state.
+
 ## 0.3.0
 
 - Rename the project to `codex-companion` and use publisher `rmsc`.
