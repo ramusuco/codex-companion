@@ -2,7 +2,7 @@
   "name": "codex-companion",
   "displayName": "codex-companion",
   "description": "A companion for Codex: conversation tabs, renaming, archiving, and account usage.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "publisher": "rmsc",
   "engines": {
     "vscode": "^1.96.2"

@@ -10,7 +10,7 @@ Requires the official `openai.chatgpt` extension.
 
 ## Install
 
-Install `codex-companion-0.7.0.vsix` using **Extensions → … → Install from VSIX**,
+Install `codex-companion-0.7.1.vsix` using **Extensions → … → Install from VSIX**,
 then run **Developer: Reload Window**.
 
 If upgrading from the early `local-tools.codex-tabs` prototype, disable or
@@ -23,7 +23,7 @@ archive state remain in Codex.
 One **codex-companion** panel appears in Explorer:
 
 - Account allowance cards at the top show large remaining percentages,
-  progress bars, and reset times. Refresh them with the adjacent button.
+  progress bars, and reset times. Refresh them with the panel header button.
   They refresh about once per minute while visible.
 - A flat conversation list below shows status icons and muted context
   estimates such as `~62% context left`, without detailed hover popups.

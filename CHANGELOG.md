@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+- Compact account allowance to the remaining percentage, progress bar, and reset time.
+- Remove the allowance heading and routine refresh footer; retain labels only for multiple limits.
+- Keep automatic refresh and unavailable/stale indicators.
+
 ## 0.7.0
 
 - Combine allowance cards and conversations in one codex-companion panel.

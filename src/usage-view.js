@@ -19,7 +19,7 @@ function renderAllowance({ limits, error, refreshing }, now = Date.now()) {
     const reset = window.resetsAt === null ? 'Reset time unavailable'
       : `Resets ${new Date(window.resetsAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`;
     return `<section class="card">
-      <div class="label">${escapeHtml(window.label)}</div>
+      ${windows.length > 1 ? `<div class="label">${escapeHtml(window.label)}</div>` : ''}
       <div class="amount">${known ? escapeHtml(remaining) + '<span class="percent">%</span>' : '—'} <span class="remaining">remaining</span></div>
       <div class="meter${display.stale || !known || remaining <= 20 ? ' caution' : ''}"
         role="progressbar" aria-label="${escapeHtml(window.label)} remaining"
@@ -30,12 +30,9 @@ function renderAllowance({ limits, error, refreshing }, now = Date.now()) {
       ${display.stale ? '<div class="notice">Last known value · awaiting refresh</div>' : ''}
     </section>`;
   }).join('');
-  const status = refreshing ? 'Updating…' : error ? 'Refresh failed. Use the refresh button to retry.'
-    : limits ? `Updated ${new Date(limits.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · auto-refresh 1 min`
-      : 'Use the refresh button to load your allowance.';
   return `${limits?.usageBlocked ? '<div class="notice">Standard usage is currently restricted.</div>' : ''}
     ${cards || `<div class="empty">${refreshing ? 'Loading allowance…' : error ? 'Allowance unavailable.' : 'No allowance data returned.'}</div>`}
-    <div class="status" role="status">${escapeHtml(status)}</div>`;
+    ${error ? '<div class="status" role="status">Refresh failed. Use the panel refresh button to retry.</div>' : ''}`;
 }
 
 function renderUsage(state, nonce, now = Date.now()) {
@@ -49,7 +46,6 @@ function renderUsage(state, nonce, now = Date.now()) {
     .allowance { padding:12px 16px; flex:0 1 auto; max-height:45%; overflow:auto; border-bottom:1px solid var(--vscode-widget-border, #8884); }
     .heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .heading .eyebrow { margin:0; }
-    .allowance .heading { margin-bottom:12px; }
     .sessions-heading { padding:12px 16px 6px; flex:none; }
     #sessions { flex:1; min-height:0; overflow:auto; padding:0 6px 8px; }
     button { font:inherit; color:inherit; background:transparent; border:0; cursor:pointer; }
@@ -75,9 +71,9 @@ function renderUsage(state, nonce, now = Date.now()) {
     .confirm { color:var(--vscode-errorForeground); background:color-mix(in srgb, var(--vscode-errorForeground) 15%, transparent); }
     [hidden] { display:none !important; }
     .eyebrow { color:var(--vscode-descriptionForeground); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin:0 0 12px; }
-    .card { padding:0 0 16px; margin:0 0 14px; border-bottom:1px solid var(--vscode-widget-border, #8884); }
+    .card + .card { margin-top:14px; padding-top:14px; border-top:1px solid var(--vscode-widget-border, #8884); }
     .label { font-weight:600; overflow-wrap:anywhere; }
-    .amount { font-size:32px; font-weight:600; line-height:1.2; margin:8px 0 10px; font-variant-numeric:tabular-nums; }
+    .amount { font-size:32px; font-weight:600; line-height:1.2; margin:0 0 10px; font-variant-numeric:tabular-nums; }
     .percent { font-size:20px; }
     .remaining { font-size:12px; color:var(--vscode-descriptionForeground); font-weight:400; }
     .meter { height:6px; background:var(--vscode-progressBar-background, #007acc); background:color-mix(in srgb, var(--vscode-foreground) 12%, transparent); border-radius:4px; overflow:hidden; }
@@ -89,7 +85,6 @@ function renderUsage(state, nonce, now = Date.now()) {
     body.vscode-high-contrast .meter, body.vscode-high-contrast-light .meter { outline:1px solid var(--vscode-contrastBorder); }
     </style></head><body>
     <section class="allowance" aria-label="Account allowance">
-      <div class="heading"><div class="eyebrow">Account allowance</div><button class="icon-button" data-action="refreshLimits" aria-label="Refresh account allowance">↻</button></div>
       <div id="allowance">${renderAllowance(state, now)}</div>
     </section>
     <div class="heading sessions-heading"><div class="eyebrow">Conversations</div></div>
