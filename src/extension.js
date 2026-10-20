@@ -10,7 +10,6 @@ const { parseLimits } = require('./limits');
 const { UsageView } = require('./usage-view');
 
 function activate(context) {
-  const changed = new vscode.EventEmitter();
   let sessions = [];
   let refreshing;
   let restoring = false;
@@ -25,8 +24,13 @@ function activate(context) {
   let limitsRefreshing;
   let limitsAttemptedAt = 0;
   const usageView = new UsageView(
-    () => ({ limits, error: limitsError, refreshing: Boolean(limitsRefreshing) }),
-    () => { if (Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report); }
+    () => ({ limits, error: limitsError, refreshing: Boolean(limitsRefreshing), sessions }),
+    () => {
+      updateTelemetry().catch(report);
+      if (Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
+    },
+    (action, row) => commands[action](row),
+    error => report(error)
   );
   const config = () => vscode.workspace.getConfiguration('codexCompanion');
   const home = () => config().get('codexHome') || process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
@@ -46,21 +50,6 @@ function activate(context) {
   const report = (error) => {
     output.appendLine(String(error?.stack || error));
     vscode.window.showErrorMessage(`codex-companion: ${error.message || error}`);
-  };
-  const provider = {
-    onDidChangeTreeData: changed.event,
-    getChildren: row => row ? [] : sessions,
-    getTreeItem(row) {
-      const item = new vscode.TreeItem(row.title || 'Untitled conversation');
-      const display = describeTelemetry(row.telemetry);
-      item.description = display.description;
-      item.tooltip = '';
-      item.accessibilityInformation = { label: `${row.title || 'Untitled conversation'}, ${display.stateLabel}, ${display.description}` };
-      item.iconPath = new vscode.ThemeIcon(display.icon, new vscode.ThemeColor(display.color));
-      item.contextValue = 'codexSession';
-      item.command = { command: 'codexCompanion.open', title: 'Open', arguments: [row] };
-      return item;
-    }
   };
   async function refreshLimits() {
     if (limitsRefreshing) return limitsRefreshing;
@@ -96,7 +85,7 @@ function activate(context) {
           row.telemetry = await telemetryReader.read(row.rolloutPath, home());
         }
       }));
-      if (!telemetryDisposed) changed.fire();
+      if (!telemetryDisposed) usageView.update();
     } finally { telemetryUpdating = false; }
   }
   async function refresh() {
@@ -109,7 +98,7 @@ function activate(context) {
         sessions = await readSessions(path.join(home(), 'session_index.jsonl'), config().get('maxSessions', 200));
       }
       await updateTelemetry();
-      changed.fire();
+      usageView.update();
     })();
     try { await refreshing; } finally { refreshing = undefined; }
   }
@@ -157,11 +146,6 @@ function activate(context) {
   async function archive(row) {
     if (!row) return;
     conversationPath(row.id);
-    const answer = await vscode.window.showWarningMessage(
-      `Archive "${row.title}"?`,
-      { modal: true, detail: 'Spawned child conversations may also be archived. Wait for active work to finish. You can restore archived conversations later.' },
-      'Archive');
-    if (answer !== 'Archive') return;
     await backend(request => request('thread/archive', { threadId: row.id }));
     await context.workspaceState.update('openSessions',
       context.workspaceState.get('openSessions', []).filter(item => item.id !== row.id));
@@ -238,20 +222,13 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand(`codexCompanion.${name}`,
       (...args) => Promise.resolve().then(() => handler(...args)).catch(report)));
   }
-  const tree = vscode.window.createTreeView('codexCompanion.sessions', { treeDataProvider: provider });
   const telemetryTimer = setInterval(() => {
-    if (tree.visible && !refreshing) updateTelemetry().catch(error => output.appendLine(String(error)));
+    if (usageView.visible && !refreshing) updateTelemetry().catch(error => output.appendLine(String(error)));
     if (usageView.visible && Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
   }, 10000);
   context.subscriptions.push(
-    changed, output,
-    tree,
-    vscode.window.registerWebviewViewProvider('codexCompanion.usage', usageView),
-    tree.onDidChangeVisibility(event => {
-      if (event.visible) {
-        updateTelemetry().catch(report);
-      }
-    }),
+    output,
+    vscode.window.registerWebviewViewProvider('codexCompanion.sessions', usageView),
     vscode.window.tabGroups.onDidChangeTabs(scheduleSave),
     vscode.window.tabGroups.onDidChangeTabGroups(scheduleSave),
     vscode.workspace.onDidChangeConfiguration(event => {

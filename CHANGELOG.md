@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+- Combine allowance cards and conversations in one codex-companion panel.
+- Keep the list scrollable while allowance cards remain above it.
+- Put conversation actions in a compact menu with no hover popup.
+- Replace the archive modal with inline Confirm and Cancel controls.
+- Update data without rebuilding the panel or closing open action menus.
+
 ## 0.6.0
 
 - Move account allowance to a dedicated Codex Usage view with percentage cards and progress bars.

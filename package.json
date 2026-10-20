@@ -2,7 +2,7 @@
   "name": "codex-companion",
   "displayName": "codex-companion",
   "description": "A companion for Codex: conversation tabs, renaming, archiving, and account usage.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "rmsc",
   "engines": {
     "vscode": "^1.96.2"
@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js && node --check src/limits.js && node --check src/usage-view.js",
+    "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js && node --check src/limits.js && node --check src/usage-view.js && node --check src/panel-client.js",
     "package": "vsce package --no-dependencies",
     "vscode:prepublish": "npm run check && npm test"
   },
@@ -88,22 +88,12 @@
     "views": {
       "explorer": [
         {
-          "id": "codexCompanion.usage",
-          "name": "Codex Usage",
-          "type": "webview"
-        },
-        {
           "id": "codexCompanion.sessions",
-          "name": "Codex Sessions"
+          "name": "codex-companion",
+          "type": "webview"
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "codexCompanion.sessions",
-        "contents": "No saved conversations yet.\n[New Conversation Tab](command:codexCompanion.new)\n[Refresh Conversations](command:codexCompanion.refresh)\nCheck the Codex Home setting if your conversations are stored elsewhere."
-      }
-    ],
     "menus": {
       "view/title": [
         {
@@ -130,28 +120,6 @@
           "command": "codexCompanion.unarchive",
           "when": "view == codexCompanion.sessions",
           "group": "actions"
-        },
-        {
-          "command": "codexCompanion.refreshLimits",
-          "when": "view == codexCompanion.usage",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "codexCompanion.openBeside",
-          "when": "view == codexCompanion.sessions && viewItem == codexSession",
-          "group": "inline"
-        },
-        {
-          "command": "codexCompanion.rename",
-          "when": "view == codexCompanion.sessions && viewItem == codexSession",
-          "group": "inline"
-        },
-        {
-          "command": "codexCompanion.archive",
-          "when": "view == codexCompanion.sessions && viewItem == codexSession",
-          "group": "inline"
         }
       ],
       "editor/title": [

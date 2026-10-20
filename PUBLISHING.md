@@ -16,7 +16,7 @@ npm test
 npm run package
 ```
 
-Output: `codex-companion-0.6.0.vsix`.
+Output: `codex-companion-0.7.0.vsix`.
 The `files` allowlist includes only runtime JavaScript, package metadata,
 README, changelog, and license. Tests, development tools, credentials and
 local Codex conversations are not included.

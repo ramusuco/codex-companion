@@ -6,7 +6,7 @@ Requires the official `openai.chatgpt` extension.
 
 ## Install
 
-Install `codex-companion-0.6.0.vsix` using **Extensions → … → Install from VSIX**,
+Install `codex-companion-0.7.0.vsix` using **Extensions → … → Install from VSIX**,
 then run **Developer: Reload Window**.
 
 If upgrading from the early `local-tools.codex-tabs` prototype, disable or
@@ -16,27 +16,28 @@ archive state remain in Codex.
 
 ## Interface
 
-Two independent views appear in Explorer:
+One **codex-companion** panel appears in Explorer:
 
-- **Codex Usage** shows account-wide allowance as cards with large remaining
-  percentages, progress bars, and reset times. The refresh button is in its
-  header. It refreshes about once per minute while visible.
-- **Codex Sessions** shows a flat conversation list. Each row has a status icon
-  and a muted context estimate such as `~62% context left`, with no detailed
-  hover popup. Unknown context is left blank.
+- Account allowance cards at the top show large remaining percentages,
+  progress bars, and reset times. Refresh them with the adjacent button.
+  They refresh about once per minute while visible.
+- A flat conversation list below shows status icons and muted context
+  estimates such as `~62% context left`, without detailed hover popups.
+  Unknown context is left blank. The list scrolls independently of the cards.
 
-Drag either view header to another sidebar or panel using VS Code's normal
+Drag the view header to another sidebar or panel using VS Code's normal
 view controls. Conversation titles remain in their original language.
 Companion controls, settings, and notifications use English.
 
 ### Conversation actions
 
 - Click a conversation to open a pinned editor tab.
-- Use the split icon to open it to the side.
+- Open a conversation's **?** menu and choose **Open to Side** for a split editor.
 - Use **+** for an independent new tab (experimental), or search by title.
-- Use the pencil to rename a conversation in Codex. Reopen existing Codex tabs
+- Choose **Rename** from the conversation menu to rename it in Codex. Reopen existing Codex tabs
   to update their titles.
-- Use the archive icon to archive a conversation after confirmation.
+- Choose **Archive**, then the inline **Confirm** button. There is no modal
+  dialog. **Cancel**, Escape, or clicking elsewhere dismisses the confirmation.
   Spawned child conversations may also be archived; wait for active work to
   finish first.
 - The view menu includes **Restore Archived Conversation** and
@@ -58,7 +59,7 @@ receive the status label even though the row displays only the icon.
 
 ## Allowance and context are different
 
-**Codex Usage** reads `account/rateLimits/read`. It uses the actual windows
+**Account allowance** reads `account/rateLimits/read`. It uses the actual windows
 returned by the service, such as a 5-hour or 7-day limit, rather than assuming
 a particular subscription. Missing limits remain unavailable. Stale results
 are labeled **Last known value**, and passing a reset time does not
@@ -124,6 +125,8 @@ queries go through local Codex app-server. Allowance queries cause official
 Codex to contact its service; its own data handling follows its settings.
 Only conversation IDs and editor positions for tab restoration are stored in
 VS Code workspace state. Conversation bodies are not displayed by the companion.
-The usage view uses no scripts or external resources.
+The combined view uses a nonce-restricted local script for interaction and no
+external resources. Conversation actions are checked against the current list
+in the extension host. Refreshes preserve existing rows and open menus.
 
 [MIT License](LICENSE)
