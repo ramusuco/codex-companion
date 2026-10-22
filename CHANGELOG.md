@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+- Pin conversations to the top of the loaded list, remembered per workspace.
+- Search titles inline with Enter to open and Escape to clear.
+- Focus existing conversation tabs instead of creating another split on click.
+
 ## 0.7.3
 
 - Preserve the bundled README screenshot link in local VSIX builds instead of rewriting it to a private GitHub URL.

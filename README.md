@@ -10,7 +10,7 @@ Requires the official `openai.chatgpt` extension.
 
 ## Install
 
-Install `codex-companion-0.7.3.vsix` using **Extensions → … → Install from VSIX**,
+Install `codex-companion-0.8.0.vsix` using **Extensions → … → Install from VSIX**,
 then run **Developer: Reload Window**.
 
 If upgrading from the early `local-tools.codex-tabs` prototype, disable or
@@ -35,7 +35,7 @@ Companion controls, settings, and notifications use English.
 
 ### Conversation actions
 
-- Click a conversation to open a pinned editor tab in a split to the side.
+- Click a conversation to focus its existing tab, or open it in a split to the side.
 - Open a conversation's **?** menu and choose **Open to Side** for a split editor.
 - Use **+** for an independent new tab (experimental), or search by title.
 - Choose **Rename** from the conversation menu to rename it in Codex. Reopen existing Codex tabs
@@ -46,6 +46,17 @@ Companion controls, settings, and notifications use English.
   finish first.
 - The view menu includes **Restore Archived Conversation** and
   **Restore Previous Tabs**. Permanent deletion is not implemented.
+
+### Pins and search
+
+Choose **Pin** or **Unpin** from a conversation's menu. Pinned conversations appear
+first and are remembered per workspace. Pins apply to the loaded recent list
+(controlled by `codexCompanion.maxSessions`); archived conversations are hidden.
+
+Type in **Search conversations** to filter loaded titles immediately. Enter opens
+the first match; Escape clears the filter. The header search button focuses this
+field. Filters stay in place during automatic updates. **Open to Side** remains
+available when you intentionally want another split of an already open conversation.
 
 ### Status icons
 

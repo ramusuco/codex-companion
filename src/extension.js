@@ -5,12 +5,14 @@ const { randomUUID } = require('node:crypto');
 const { readSessions, conversationPath, UUID } = require('./sessions');
 const { withServer, listSessions } = require('./backend');
 const fs = require('node:fs');
-const { TelemetryReader, describeTelemetry } = require('./telemetry');
+const { TelemetryReader } = require('./telemetry');
 const { parseLimits } = require('./limits');
 const { UsageView } = require('./usage-view');
+const { findConversationTab } = require('./editor-target');
 
 function activate(context) {
   let sessions = [];
+  const pinned = new Set(context.workspaceState.get('pinnedSessions', []));
   let refreshing;
   let restoring = false;
   let saveTimer;
@@ -24,7 +26,8 @@ function activate(context) {
   let limitsRefreshing;
   let limitsAttemptedAt = 0;
   const usageView = new UsageView(
-    () => ({ limits, error: limitsError, refreshing: Boolean(limitsRefreshing), sessions }),
+    () => ({ limits, error: limitsError, refreshing: Boolean(limitsRefreshing),
+      sessions: sessions.map(row => ({ ...row, pinned: pinned.has(row.id) })) }),
     () => {
       updateTelemetry().catch(report);
       if (Date.now() - limitsAttemptedAt >= 60000) refreshLimits().catch(report);
@@ -112,18 +115,25 @@ function activate(context) {
       preview: false, preserveFocus: false
     });
   }
-  async function openSession(row, column) {
+  async function openSession(row, column, reuse = false) {
     if (!row) return search();
+    if (reuse) {
+      const route = conversationPath(row.id);
+      const target = findConversationTab(vscode.window.tabGroups.all, route);
+      if (target) {
+        await vscode.commands.executeCommand('vscode.openWith', target.uri, 'chatgpt.conversationEditor', {
+          viewColumn: target.column, preview: false, preserveFocus: false
+        });
+        scheduleSave();
+        return;
+      }
+    }
     await openRoute(conversationPath(row.id), column);
     scheduleSave();
   }
   async function search() {
-    await refresh();
-    const selected = await vscode.window.showQuickPick(sessions.map(row => ({
-      label: row.title || 'Untitled conversation',
-      description: describeTelemetry(row.telemetry).description, row
-    })), { placeHolder: 'Search saved Codex conversations', matchOnDescription: true });
-    if (selected) await openSession(selected.row);
+    usageView.requestSearch();
+    await vscode.commands.executeCommand('codexCompanion.sessions.focus');
   }
   async function manage(action) {
     if (managing) return;
@@ -211,13 +221,22 @@ function activate(context) {
   }
   const commands = {
     new: () => openRoute('/extension/panel/new', undefined, `codexCompanion=${randomUUID()}`),
-    open: row => openSession(row, vscode.ViewColumn.Beside),
+    open: row => openSession(row, vscode.ViewColumn.Beside, true),
     openBeside: row => openSession(row, vscode.ViewColumn.Beside),
     search, refresh: () => Promise.all([refresh(), refreshLimits()]), restore, refreshLimits,
     rename: row => manage(() => rename(row)),
     archive: row => manage(() => archive(row)),
     unarchive: () => manage(unarchive)
   };
+  commands.togglePin = row => manage(async () => {
+    if (!row) return;
+    const next = new Set(pinned);
+    if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
+    await context.workspaceState.update('pinnedSessions', [...next]);
+    pinned.clear();
+    for (const id of next) pinned.add(id);
+    usageView.update();
+  });
   for (const [name, handler] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(`codexCompanion.${name}`,
       (...args) => Promise.resolve().then(() => handler(...args)).catch(report)));

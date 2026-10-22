@@ -3,6 +3,18 @@
   const vscode = acquireVsCodeApi();
   const list = document.getElementById('sessions');
   const rows = new Map();
+  const search = document.getElementById('search');
+  const normalize = value => value.normalize('NFKC').toLocaleLowerCase();
+  function filterRows() {
+    const terms = normalize(search.value).trim().split(/\s+/).filter(Boolean);
+    let count = 0;
+    for (const row of rows.values()) {
+      row.hidden = !terms.every(term => normalize(row.querySelector('.title').textContent).includes(term));
+      if (!row.hidden) count++;
+    }
+    document.getElementById('no-matches').hidden = !rows.size || count > 0;
+  }
+  search.addEventListener('input', () => { closeActions(); filterRows(); });
   let selectedId;
   const icons = {
     'sync~spin': ['responding', ''],
@@ -24,15 +36,20 @@
     row.className = 'session';
     row.dataset.id = id;
     row.innerHTML = `<div class="session-main">
-      <button class="open" data-action="open"><span class="state" aria-hidden="true"></span><span class="title"></span><span class="context"></span></button>
+      <button class="open" data-action="open"><span class="state" aria-hidden="true"></span><span class="pin" aria-hidden="true" hidden>◆</span><span class="title"></span><span class="context"></span></button>
       <button class="icon-button" data-action="menu" aria-label="Conversation actions" aria-expanded="false">⋯</button>
       </div>
-      <div class="actions" hidden><button data-action="openBeside">Open to Side</button><button data-action="rename">Rename</button><button data-action="archivePrompt">Archive</button></div>
+      <div class="actions" hidden><button data-action="togglePin">Pin</button><button data-action="openBeside">Open to Side</button><button data-action="rename">Rename</button><button data-action="archivePrompt">Archive</button></div>
       <div class="confirmation" hidden><span>Archive?</span><button class="confirm" data-action="archive">Confirm</button><button data-action="cancel">Cancel</button></div>`;
     return row;
   }
   window.addEventListener('message', event => {
     const data = event.data;
+    if (data?.type === 'focusSearch') {
+      search.focus(); search.select();
+      vscode.postMessage({ action: 'searchFocused' });
+      return;
+    }
     if (data?.type !== 'update') return;
     const allowance = document.getElementById('allowance');
     // Only trusted, escaped HTML produced by the extension host enters this slot.
@@ -46,8 +63,10 @@
       if (!row) { row = makeRow(session.id); rows.set(session.id, row); }
       row.querySelector('.title').textContent = session.title;
       row.querySelector('.context').textContent = session.description;
+      row.querySelector('.pin').hidden = !session.pinned;
+      row.querySelector('[data-action="togglePin"]').textContent = session.pinned ? 'Unpin' : 'Pin';
       row.querySelector('.open').setAttribute('aria-label',
-        `${session.title}, ${session.stateLabel}, ${session.description}`);
+        `${session.pinned ? 'Pinned, ' : ''}${session.title}, ${session.stateLabel}, ${session.description}`);
       row.querySelector('[data-action="menu"]').setAttribute('aria-label', `Actions for ${session.title}`);
       const [kind, glyph] = icons[session.icon] || icons.question;
       const icon = row.querySelector('.state');
@@ -57,6 +76,7 @@
       if (list.children[index] !== row) list.insertBefore(row, list.children[index] || null);
     });
     document.getElementById('empty').hidden = data.sessions.length !== 0;
+    filterRows();
   });
   document.addEventListener('click', event => {
     const button = event.target.closest('button[data-action]');
@@ -87,6 +107,14 @@
     vscode.postMessage({ action, id: row?.dataset.id });
   });
   document.addEventListener('keydown', event => {
+    if (document.activeElement === search) {
+      if (event.key === 'Escape') { search.value = ''; filterRows(); }
+      if (event.key === 'Enter') {
+        const row = [...list.children].find(row => !row.hidden);
+        if (row) vscode.postMessage({ action: 'open', id: row.dataset.id });
+      }
+      return;
+    }
     if (event.key === 'Escape') {
       const row = document.activeElement.closest('.session');
       closeActions();

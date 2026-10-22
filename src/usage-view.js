@@ -47,6 +47,10 @@ function renderUsage(state, nonce, now = Date.now()) {
     .heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .heading .eyebrow { margin:0; }
     .sessions-heading { padding:12px 16px 6px; flex:none; }
+    .search-box { padding:4px 12px 8px; flex:none; }
+    #search { box-sizing:border-box; width:100%; padding:5px 7px; color:var(--vscode-input-foreground); background:var(--vscode-input-background); border:1px solid var(--vscode-input-border, transparent); font:inherit; }
+    #search:focus { outline:1px solid var(--vscode-focusBorder); }
+    .pin { color:var(--vscode-descriptionForeground); font-size:11px; flex-shrink:0; }
     #sessions { flex:1; min-height:0; overflow:auto; padding:0 6px 8px; }
     button { font:inherit; color:inherit; background:transparent; border:0; cursor:pointer; }
     button:focus-visible { outline:1px solid var(--vscode-focusBorder); outline-offset:-1px; }
@@ -88,14 +92,16 @@ function renderUsage(state, nonce, now = Date.now()) {
       <div id="allowance">${renderAllowance(state, now)}</div>
     </section>
     <div class="heading sessions-heading"><div class="eyebrow">Conversations</div></div>
+    <div class="search-box"><input id="search" type="search" placeholder="Search conversations" aria-label="Search conversations" autocomplete="off"></div>
     <div id="sessions" aria-label="Conversations"></div>
+    <div id="no-matches" class="empty" style="padding:8px 16px" hidden>No matching conversations.</div>
     <div id="empty" class="empty" style="padding:8px 16px" hidden>No saved conversations yet. <button data-action="new">New conversation</button></div>
     <script nonce="${nonce}">${readFileSync(path.join(__dirname, 'panel-client.js'), 'utf8')}</script>
     </body></html>`;
 }
 
 const GLOBAL_ACTIONS = new Set(['new', 'refreshLimits']);
-const SESSION_ACTIONS = new Set(['open', 'openBeside', 'rename', 'archive']);
+const SESSION_ACTIONS = new Set(['open', 'openBeside', 'rename', 'archive', 'togglePin']);
 
 class UsageView {
   constructor(getState, onVisible, onAction = () => {}, onError = () => {}) {
@@ -107,7 +113,8 @@ class UsageView {
     view.webview.options = { enableScripts: true, localResourceRoots: [] };
     const messages = view.webview.onDidReceiveMessage(message => {
       if (this.view !== view) return;
-      if (message?.action === 'ready') { this.update(); return; }
+      if (message?.action === 'ready') { this.update(); if (this.searchPending) this.requestSearch(); return; }
+      if (message?.action === 'searchFocused') { this.searchPending = false; return; }
       this.handleAction(message).catch(this.onError);
     });
     view.webview.html = renderUsage(this.getState(), randomBytes(16).toString('hex'));
@@ -128,12 +135,16 @@ class UsageView {
     const row = (this.getState().sessions || []).find(row => row.id === message.id);
     if (row) return this.onAction(message.action, row);
   }
+  requestSearch() {
+    this.searchPending = true;
+    if (this.view) Promise.resolve(this.view.webview.postMessage({ type: 'focusSearch' })).catch(this.onError);
+  }
   update() {
     if (!this.view) return;
     const state = this.getState();
     const sessions = (state.sessions || []).map(row => ({
-      id: row.id, title: row.title || 'Untitled conversation', ...describeTelemetry(row.telemetry)
-    }));
+      id: row.id, title: row.title || 'Untitled conversation', pinned: Boolean(row.pinned), ...describeTelemetry(row.telemetry)
+    })).sort((a, b) => Number(b.pinned) - Number(a.pinned));
     Promise.resolve(this.view.webview.postMessage({
       type: 'update', allowance: renderAllowance(state), sessions
     })).catch(this.onError);

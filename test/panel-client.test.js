@@ -9,7 +9,7 @@ function setup() {
   const events = {}, sent = [], nodes = {};
   const element = () => ({
     hidden: false, dataset: {}, children: [], classList: { toggle() {} },
-    setAttribute() {}, focus() { this.focused = true; },
+    value: '', select() {}, addEventListener(type, fn) { this[type] = fn; }, setAttribute() {}, focus() { this.focused = true; },
     querySelector(selector) { return this.parts[selector]; },
     parts: {}
   });
@@ -17,12 +17,14 @@ function setup() {
   nodes.sessions.insertBefore = row => nodes.sessions.children.push(row);
   nodes.allowance = element();
   nodes.empty = element();
+  nodes.search = element();
+  nodes['no-matches'] = element();
   const document = {
     getElementById: id => nodes[id],
     addEventListener: (type, fn) => { events[type] = fn; },
     createElement() {
       const row = element();
-      for (const selector of ['.actions', '.confirmation', '.title', '.context', '.open', '.state',
+      for (const selector of ['.actions', '.confirmation', '.title', '.context', '.open', '.state', '.pin', '[data-action="togglePin"]',
         '[data-action="menu"]', '[data-action="archive"]']) row.parts[selector] = element();
       row.parts['.actions'].hidden = true;
       row.parts['.confirmation'].hidden = true;
@@ -43,7 +45,7 @@ function setup() {
     dataset: { action }, closest: () => row, setAttribute() {}
   }) } });
   document.activeElement = row;
-  return { events, sent, update, row, click };
+  return { events, sent, update, row, click, nodes, document };
 }
 
 test('archive requires an inline confirm; cancellation and Escape never dispatch archive', () => {
@@ -73,4 +75,26 @@ test('refresh preserves row and pending confirmation; titles are assigned as tex
   assert.equal(row.parts['.title'].textContent, '<img src=x>');
   assert.equal(row.parts['.state'].className, 'state responding');
   assert.equal(row.parts['.context'].textContent, '~62% context left');
+});
+
+
+test('inline search handles normalization, refresh, Enter and Escape', () => {
+ const {nodes, document, row, update, events, sent} = setup();
+ document.activeElement = nodes.search;
+ nodes.search.value = '\uFF29\uFF2D\uFF27'; nodes.search.input();
+ assert.equal(row.hidden, false);
+ events.keydown({key:'Enter'});
+ assert.deepEqual(sent.at(-1), {action:'open',id:'one'});
+ nodes.search.value='missing'; nodes.search.input(); update();
+ assert.equal(row.hidden,true);
+ assert.equal(nodes['no-matches'].hidden,false);
+ events.keydown({key:'Escape'});
+ assert.equal(row.hidden,false);
+ assert.equal(nodes.search.value,'');
+});
+
+test('pin action targets its conversation', () => {
+ const {click, sent} = setup();
+ click('togglePin');
+ assert.deepEqual(sent.at(-1), {action:'togglePin',id:'one'});
 });

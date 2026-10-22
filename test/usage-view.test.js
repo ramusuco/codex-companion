@@ -50,11 +50,16 @@ test('webview sends data updates without replacing its document, resyncs on read
   assert.deepEqual(view.webview.options.localResourceRoots, []);
   assert.equal(visibleCalls, 1);
   const initialHtml = view.webview.html;
-  state = { limits };
+  state = { limits, sessions: [
+    { id: 'recent', title: 'Recent' },
+    { id: 'favorite', title: 'Favorite', pinned: true }
+  ] };
   onMessage({ action: 'ready' });
   provider.update();
   assert.equal(updates.length, 2);
   assert.match(updates[0].allowance, /aria-valuenow="76"/);
+  assert.deepEqual(updates[0].sessions.map(row => row.id), ['favorite', 'recent']);
+  assert.equal(updates[0].sessions[0].pinned, true);
   assert.equal(view.webview.html, initialHtml);
   view.visible = false; onVisibility();
   assert.equal(provider.visible, false);
