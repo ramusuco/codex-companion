@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.3
+
+- Preserve the bundled README screenshot link in local VSIX builds instead of rewriting it to a private GitHub URL.
+
 ## 0.7.2
 
 - Open conversations in a split editor by default when clicking the conversation list.

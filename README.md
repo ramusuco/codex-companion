@@ -10,7 +10,7 @@ Requires the official `openai.chatgpt` extension.
 
 ## Install
 
-Install `codex-companion-0.7.2.vsix` using **Extensions → … → Install from VSIX**,
+Install `codex-companion-0.7.3.vsix` using **Extensions → … → Install from VSIX**,
 then run **Developer: Reload Window**.
 
 If upgrading from the early `local-tools.codex-tabs` prototype, disable or

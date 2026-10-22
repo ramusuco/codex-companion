@@ -2,7 +2,7 @@
   "name": "codex-companion",
   "displayName": "codex-companion",
   "description": "A companion for Codex: conversation tabs, renaming, archiving, and account usage.",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "publisher": "rmsc",
   "engines": {
     "vscode": "^1.96.2"
@@ -20,7 +20,7 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check src/extension.js && node --check src/backend.js && node --check src/sessions.js && node --check src/telemetry.js && node --check src/limits.js && node --check src/usage-view.js && node --check src/panel-client.js",
-    "package": "vsce package --no-dependencies",
+    "package": "vsce package --no-dependencies --no-rewrite-relative-links",
     "vscode:prepublish": "npm run check && npm test"
   },
   "contributes": {

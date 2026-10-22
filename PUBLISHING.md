@@ -16,7 +16,7 @@ npm test
 npm run package
 ```
 
-Output: `codex-companion-0.7.2.vsix`.
+Output: `codex-companion-0.7.3.vsix`.
 The `files` allowlist includes only runtime JavaScript, package metadata,
 README, changelog, and license. Tests, development tools, credentials and
 local Codex conversations are not included.
@@ -60,3 +60,8 @@ releases. macOS, Linux, Remote SSH and WSL UI behavior still need manual checks.
 
 Official publishing reference:
 https://code.visualstudio.com/api/working-with-extensions/publishing-extension
+
+Local VSIX builds preserve relative README links so the installed extension can
+load its bundled screenshot without access to the private GitHub repository.
+Before Marketplace publication, make the screenshot publicly accessible and
+use the normal vsce link rewriting for the Marketplace web listing.
