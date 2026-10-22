@@ -10,7 +10,7 @@ Requires the official `openai.chatgpt` extension.
 
 ## Install
 
-Install `codex-companion-0.7.1.vsix` using **Extensions → … → Install from VSIX**,
+Install `codex-companion-0.7.2.vsix` using **Extensions → … → Install from VSIX**,
 then run **Developer: Reload Window**.
 
 If upgrading from the early `local-tools.codex-tabs` prototype, disable or
@@ -35,7 +35,7 @@ Companion controls, settings, and notifications use English.
 
 ### Conversation actions
 
-- Click a conversation to open a pinned editor tab.
+- Click a conversation to open a pinned editor tab in a split to the side.
 - Open a conversation's **?** menu and choose **Open to Side** for a split editor.
 - Use **+** for an independent new tab (experimental), or search by title.
 - Choose **Rename** from the conversation menu to rename it in Codex. Reopen existing Codex tabs

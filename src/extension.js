@@ -211,7 +211,7 @@ function activate(context) {
   }
   const commands = {
     new: () => openRoute('/extension/panel/new', undefined, `codexCompanion=${randomUUID()}`),
-    open: openSession,
+    open: row => openSession(row, vscode.ViewColumn.Beside),
     openBeside: row => openSession(row, vscode.ViewColumn.Beside),
     search, refresh: () => Promise.all([refresh(), refreshLimits()]), restore, refreshLimits,
     rename: row => manage(() => rename(row)),

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+
+- Open conversations in a split editor by default when clicking the conversation list.
+
 ## 0.7.1
 
 - Compact account allowance to the remaining percentage, progress bar, and reset time.
